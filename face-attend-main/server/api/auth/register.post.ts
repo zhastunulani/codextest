@@ -4,18 +4,13 @@ import { users } from '~/server/db/schema'
 import { eq } from 'drizzle-orm'
 import { signToken } from '~/server/utils/auth'
 import { logAudit } from '~/server/utils/audit'
+import { normalizeLogin, validateDisplayName, validatePassword } from '~/server/utils/validate'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
-  const { login, password, name } = body
-
-  if (!login || !password || !name) {
-    throw createError({ statusCode: 400, statusMessage: 'Логин, пароль және аты қажет' })
-  }
-
-  if (String(password).length < 8) {
-    throw createError({ statusCode: 400, statusMessage: 'Пароль кемінде 8 таңба болуы керек' })
-  }
+  const login = normalizeLogin(body?.login)
+  const password = validatePassword(body?.password)
+  const name = validateDisplayName(body?.name)
 
   const [exists] = await db.select({ id: users.id }).from(users).where(eq(users.login, login))
   if (exists) {
