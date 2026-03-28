@@ -1,10 +1,20 @@
 import bcryptjs from 'bcryptjs'
 import { db } from '~/server/db'
 import { users } from '~/server/db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { signToken } from '~/server/utils/auth'
+import { checkRateLimit } from '~/server/utils/rate-limit'
+
+const MAX_ATTEMPTS = 3
+const WINDOW_MS = 15 * 60 * 1000
 
 export default defineEventHandler(async (event) => {
+  const limit = checkRateLimit(event, 'admin-login', MAX_ATTEMPTS, WINDOW_MS)
+  if (!limit.allowed) {
+    setResponseHeader(event, 'Retry-After', String(limit.retryAfterSec || 900))
+    throw createError({ statusCode: 429, statusMessage: 'Тым көп қате әрекет. Кейінірек қайталап көріңіз.' })
+  }
+
   const body = await readBody(event)
   const { login, password } = body
 
@@ -12,9 +22,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Логин мен пароль қажет' })
   }
 
-  const [user] = await db.select().from(users).where(eq(users.login, login))
+  const [user] = await db.select().from(users)
+    .where(and(eq(users.login, login), eq(users.role, 'admin')))
 
-  if (!user || !user.isActive || user.role === 'admin') {
+  if (!user || !user.isActive) {
     throw createError({ statusCode: 401, statusMessage: 'Логин немесе пароль қате' })
   }
 
@@ -26,7 +37,7 @@ export default defineEventHandler(async (event) => {
   const token = signToken({
     id: user.id,
     login: user.login,
-    role: user.role as 'head' | 'employee',
+    role: 'admin',
     departmentId: user.departmentId ?? undefined,
   })
 

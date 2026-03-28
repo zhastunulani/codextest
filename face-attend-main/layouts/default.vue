@@ -24,7 +24,7 @@
               :class="{
                 'bg-red-100 text-red-700': user?.role === 'admin',
                 'bg-blue-100 text-blue-700': user?.role === 'head',
-                'bg-green-100 text-green-700': user?.role === 'manager',
+                'bg-green-100 text-green-700': user?.role === 'employee',
               }">
               {{ roleLabel }}
             </span>
@@ -64,7 +64,7 @@ const route = useRoute()
 const { user, logout } = useAuth()
 
 const roleLabel = computed(() => {
-  const labels: Record<string, string> = { admin: 'Админ', head: 'Басшы', manager: 'Менеджер' }
+  const labels: Record<string, string> = { admin: 'Админ', head: 'Басшы', employee: 'Қызметкер' }
   return user.value ? labels[user.value.role] || user.value.role : ''
 })
 
