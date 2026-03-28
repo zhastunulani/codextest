@@ -1,16 +1,18 @@
 import { db } from '~/server/db'
-import { kpiTargets, kpiResults, attendance, employees, departments } from '~/server/db/schema'
+import { kpiTargets, attendance, employees, departments } from '~/server/db/schema'
 import { eq, like, and } from 'drizzle-orm'
-import { requireAuth } from '~/server/utils/auth'
+import { requireRole } from '~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
-  const period = getRouterParam(event, 'period') // e.g. "2026-03"
+  const user = requireRole(event, ['admin', 'head'])
+  const period = getRouterParam(event, 'period')
   if (!period || !/^\d{4}-\d{2}$/.test(period)) {
     throw createError({ statusCode: 400, statusMessage: 'Кезең форматы: YYYY-MM' })
   }
 
-  const allDepts = await db.select().from(departments)
+  const allDepts = user.role === 'head' && user.departmentId
+    ? (await db.select().from(departments)).filter(d => d.id === user.departmentId)
+    : await db.select().from(departments)
   const targets = await db.select().from(kpiTargets).where(eq(kpiTargets.period, period))
 
   const results = []
@@ -21,7 +23,6 @@ export default defineEventHandler(async (event) => {
 
     if (deptEmployees.length === 0) continue
 
-    // Calculate attendance rate
     let totalPresent = 0
     let totalExpected = 0
     let totalOvertimeMin = 0
@@ -31,7 +32,7 @@ export default defineEventHandler(async (event) => {
       const records = await db.select().from(attendance)
         .where(and(eq(attendance.employeeId, emp.id), like(attendance.date, `${period}%`)))
       totalPresent += records.filter(r => r.checkIn).length
-      totalExpected += 22 // approximate working days
+      totalExpected += 22
       totalOvertimeMin += records.reduce((sum, r) => sum + r.overtimeMinutes, 0)
       totalLateCount += records.filter(r => r.isLate).length
     }

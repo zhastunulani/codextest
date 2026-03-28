@@ -1,10 +1,10 @@
 import { db } from '~/server/db'
 import { attendance, employees, departments } from '~/server/db/schema'
 import { eq, like } from 'drizzle-orm'
-import { requireAuth } from '~/server/utils/auth'
+import { requireRole } from '~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
+  const user = requireRole(event, ['admin', 'head'])
   const query = getQuery(event)
   const { year, month } = query
 
@@ -14,9 +14,10 @@ export default defineEventHandler(async (event) => {
 
   const monthPrefix = `${year}-${String(month).padStart(2, '0')}`
 
-  const records = await db.select({
+  const rows = await db.select({
     employeeId: attendance.employeeId,
     employeeName: employees.name,
+    departmentId: employees.departmentId,
     departmentName: departments.name,
     date: attendance.date,
     checkIn: attendance.checkIn,
@@ -31,7 +32,10 @@ export default defineEventHandler(async (event) => {
     .leftJoin(departments, eq(employees.departmentId, departments.id))
     .where(like(attendance.date, `${monthPrefix}%`))
 
-  // Group by employee
+  const records = user.role === 'head' && user.departmentId
+    ? rows.filter(r => r.departmentId === user.departmentId)
+    : rows
+
   const grouped: Record<number, any> = {}
   for (const r of records) {
     if (!grouped[r.employeeId]) {
@@ -59,8 +63,7 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Build Excel XML (SpreadsheetML - opens in Excel, Google Sheets, etc.)
-  const rows = Object.values(grouped)
+  const rowsOut = Object.values(grouped)
   const monthNames = ['', 'Қаңтар', 'Ақпан', 'Наурыз', 'Сәуір', 'Мамыр', 'Маусым', 'Шілде', 'Тамыз', 'Қыркүйек', 'Қазан', 'Қараша', 'Желтоқсан']
   const title = `Табель - ${monthNames[Number(month)]} ${year}`
 
@@ -106,7 +109,7 @@ export default defineEventHandler(async (event) => {
         <Cell ss:StyleID="header"><Data ss:Type="String">Үстеме сағат</Data></Cell>
       </Row>`
 
-  rows.forEach((r, i) => {
+  rowsOut.forEach((r, i) => {
     const workHours = (r.totalWorkMinutes / 60).toFixed(1)
     const overtimeHours = (r.totalOvertimeMinutes / 60).toFixed(1)
     xml += `
