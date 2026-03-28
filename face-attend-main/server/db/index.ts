@@ -87,6 +87,7 @@ async function initDatabase() {
 
 
       ALTER TABLE employees ADD COLUMN IF NOT EXISTS user_id INTEGER;
+      CREATE UNIQUE INDEX IF NOT EXISTS employees_user_id_unique ON employees(user_id) WHERE user_id IS NOT NULL;
       CREATE TABLE IF NOT EXISTS attendance (
         id SERIAL PRIMARY KEY,
         employee_id INTEGER NOT NULL REFERENCES employees(id),

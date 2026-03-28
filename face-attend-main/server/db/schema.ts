@@ -43,7 +43,9 @@ export const employees = pgTable('employees', {
   vacationDaysLeft: integer('vacation_days_left').notNull().default(24),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
-})
+}, (table) => [
+  unique('employees_user_id_unique').on(table.userId),
+])
 
 // ==================== Жұмыс кестесі ====================
 
