@@ -1,10 +1,10 @@
 import { db } from '~/server/db'
 import { payroll, employees } from '~/server/db/schema'
 import { eq, and } from 'drizzle-orm'
-import { requireAuth } from '~/server/utils/auth'
+import { requireRole } from '~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
+  const user = requireRole(event, ['admin', 'head'])
   const query = getQuery(event)
   const { month, year } = query
 
@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Ай мен жыл қажет' })
   }
 
-  return await db.select({
+  const rows = await db.select({
     id: payroll.id,
     employeeId: payroll.employeeId,
     employeeName: employees.name,
@@ -30,4 +30,10 @@ export default defineEventHandler(async (event) => {
     .from(payroll)
     .innerJoin(employees, eq(payroll.employeeId, employees.id))
     .where(and(eq(payroll.month, Number(month)), eq(payroll.year, Number(year))))
+
+  if (user.role === 'head' && user.departmentId) {
+    return rows.filter(r => r.departmentId === user.departmentId)
+  }
+
+  return rows
 })

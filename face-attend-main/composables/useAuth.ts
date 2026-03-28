@@ -2,7 +2,7 @@ interface User {
   id: number
   login: string
   name: string
-  role: 'admin' | 'head' | 'manager'
+  role: 'admin' | 'head' | 'employee'
   departmentId?: number
 }
 
@@ -36,7 +36,7 @@ export const useAuth = () => {
 
   const isAdmin = computed(() => user.value?.role === 'admin')
   const isHead = computed(() => user.value?.role === 'head')
-  const isManager = computed(() => user.value?.role === 'manager')
+  const isEmployee = computed(() => user.value?.role === 'employee')
 
-  return { user, isLoggedIn, login, logout, fetchUser, isAdmin, isHead, isManager }
+  return { user, isLoggedIn, login, logout, fetchUser, isAdmin, isHead, isEmployee }
 }

@@ -3,19 +3,13 @@ import { db } from '~/server/db'
 import { users } from '~/server/db/schema'
 import { eq } from 'drizzle-orm'
 import { requireAuth } from '~/server/utils/auth'
+import { validatePassword } from '~/server/utils/validate'
 
 export default defineEventHandler(async (event) => {
   const user = requireAuth(event)
   const body = await readBody(event)
-  const { oldPassword, newPassword } = body
-
-  if (!oldPassword || !newPassword) {
-    throw createError({ statusCode: 400, statusMessage: 'Ескі және жаңа пароль қажет' })
-  }
-
-  if (newPassword.length < 8) {
-    throw createError({ statusCode: 400, statusMessage: 'Жаңа пароль кемінде 8 таңба болуы керек' })
-  }
+  const oldPassword = validatePassword(body?.oldPassword)
+  const newPassword = validatePassword(body?.newPassword)
 
   const [dbUser] = await db.select().from(users).where(eq(users.id, user.id))
   if (!dbUser) {
