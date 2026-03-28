@@ -1,8 +1,11 @@
 import { db } from '~/server/db'
 import { attendance, employees, schedules } from '~/server/db/schema'
 import { eq, and } from 'drizzle-orm'
+import { requireRole } from '~/server/utils/auth'
+import { logAudit } from '~/server/utils/audit'
 
 export default defineEventHandler(async (event) => {
+  const authUser = requireRole(event, ['admin', 'head', 'employee'])
   const body = await readBody(event)
   const { employeeId, type, photo } = body
 
@@ -69,6 +72,8 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    await logAudit({ userId: authUser.id, action: 'ATTENDANCE_CHECKIN', details: { employeeId, type: 'in', date, time } })
+
     return {
       success: true,
       employeeName: employee.name,
@@ -114,6 +119,8 @@ export default defineEventHandler(async (event) => {
     await db.update(attendance).set({
       checkOut: time, checkOutPhoto: photoPath, overtimeMinutes,
     }).where(eq(attendance.id, existing.id))
+
+    await logAudit({ userId: authUser.id, action: 'ATTENDANCE_CHECKOUT', details: { employeeId, type: 'out', date, time } })
 
     return {
       success: true,

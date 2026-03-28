@@ -1,10 +1,12 @@
 import jwt from 'jsonwebtoken'
 import type { H3Event } from 'h3'
 
+export type UserRole = 'admin' | 'head' | 'employee'
+
 interface JwtPayload {
   id: number
   login: string
-  role: 'admin' | 'head' | 'manager'
+  role: UserRole
   departmentId?: number
 }
 
@@ -36,7 +38,7 @@ export function requireAuth(event: H3Event): JwtPayload {
   return user
 }
 
-export function requireRole(event: H3Event, roles: string[]): JwtPayload {
+export function requireRole(event: H3Event, roles: UserRole[]): JwtPayload {
   const user = requireAuth(event)
   if (!roles.includes(user.role)) {
     throw createError({ statusCode: 403, statusMessage: 'Рұқсат жоқ' })
