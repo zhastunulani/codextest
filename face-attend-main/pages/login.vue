@@ -21,9 +21,15 @@
         </button>
       </form>
 
-      <div class="mt-6 text-center">
-        <NuxtLink to="/scan" class="text-primary-600 text-sm hover:underline">
+      <div class="mt-6 text-center text-sm space-y-2">
+        <NuxtLink to="/scan" class="text-primary-600 hover:underline block">
           Сканерлеу бетіне өту →
+        </NuxtLink>
+        <NuxtLink to="/register" class="text-gray-600 hover:underline block">
+          Қызметкер тіркелуі
+        </NuxtLink>
+        <NuxtLink to="/admin/login" class="text-red-600 hover:underline block">
+          Админ кіруі
         </NuxtLink>
       </div>
     </div>

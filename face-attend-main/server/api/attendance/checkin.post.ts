@@ -7,10 +7,25 @@ import { logAudit } from '~/server/utils/audit'
 export default defineEventHandler(async (event) => {
   const authUser = requireRole(event, ['admin', 'head', 'employee'])
   const body = await readBody(event)
-  const { employeeId, type, photo } = body
+  let { employeeId, type, photo } = body
 
-  if (!employeeId || !type) {
-    throw createError({ statusCode: 400, statusMessage: 'employee_id және type қажет' })
+  if (!type) {
+    throw createError({ statusCode: 400, statusMessage: 'type қажет' })
+  }
+
+  if (authUser.role === 'employee') {
+    const [ownEmployee] = await db.select().from(employees)
+      .where(and(eq(employees.userId, authUser.id), eq(employees.isActive, true)))
+
+    if (!ownEmployee) {
+      throw createError({ statusCode: 403, statusMessage: 'Employee профилі табылмады' })
+    }
+
+    employeeId = ownEmployee.id
+  }
+
+  if (!employeeId) {
+    throw createError({ statusCode: 400, statusMessage: 'employee_id қажет' })
   }
 
   const [employee] = await db.select().from(employees).where(eq(employees.id, employeeId))
@@ -20,9 +35,8 @@ export default defineEventHandler(async (event) => {
 
   const now = new Date()
   const date = now.toISOString().split('T')[0]
-  const time = now.toTimeString().split(' ')[0] // HH:MM:SS
+  const time = now.toTimeString().split(' ')[0]
 
-  // Save photo
   let photoPath: string | null = null
   if (photo) {
     const { writeFileSync, existsSync, mkdirSync } = await import('fs')
@@ -35,17 +49,14 @@ export default defineEventHandler(async (event) => {
     photoPath = `/uploads/checkins/${filename}`
   }
 
-  // Check existing record for today
   const [existing] = await db.select().from(attendance)
     .where(and(eq(attendance.employeeId, employeeId), eq(attendance.date, date)))
 
-  // Check-in
   if (type === 'in') {
     if (existing?.checkIn) {
       return { success: false, message: 'Бүгін check-in жазылған', time: existing.checkIn }
     }
 
-    // Calculate lateness
     let isLate = false
     let lateMinutes = 0
     if (employee.scheduleId) {
@@ -85,7 +96,6 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Check-out
   if (type === 'out') {
     if (!existing?.checkIn) {
       throw createError({ statusCode: 400, statusMessage: 'Алдымен check-in жасаңыз' })
@@ -94,7 +104,6 @@ export default defineEventHandler(async (event) => {
       return { success: false, message: 'Бүгін check-out жазылған', time: existing.checkOut }
     }
 
-    // 30-minute minimum check
     const [inH, inM] = existing.checkIn.split(':').map(Number)
     const [outH, outM] = time.split(':').map(Number)
     const workedMin = (outH * 60 + outM) - (inH * 60 + inM)
@@ -102,7 +111,6 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'Check-in мен check-out арасы кемінде 30 минут болуы керек' })
     }
 
-    // Calculate overtime
     let overtimeMinutes = 0
     if (employee.scheduleId) {
       const [schedule] = await db.select().from(schedules).where(eq(schedules.id, employee.scheduleId))

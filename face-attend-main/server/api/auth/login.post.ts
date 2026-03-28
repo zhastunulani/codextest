@@ -4,14 +4,12 @@ import { users } from '~/server/db/schema'
 import { eq } from 'drizzle-orm'
 import { signToken } from '~/server/utils/auth'
 import { logAudit } from '~/server/utils/audit'
+import { normalizeLogin, validatePassword } from '~/server/utils/validate'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
-  const { login, password } = body
-
-  if (!login || !password) {
-    throw createError({ statusCode: 400, statusMessage: 'Логин мен пароль қажет' })
-  }
+  const login = normalizeLogin(body?.login)
+  const password = validatePassword(body?.password)
 
   const [user] = await db.select().from(users).where(eq(users.login, login))
 

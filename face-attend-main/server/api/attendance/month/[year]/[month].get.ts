@@ -1,10 +1,10 @@
 import { db } from '~/server/db'
 import { attendance, employees } from '~/server/db/schema'
 import { eq, like } from 'drizzle-orm'
-import { requireAuth } from '~/server/utils/auth'
+import { requireRole } from '~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
+  const user = requireRole(event, ['admin', 'head'])
   const year = getRouterParam(event, 'year')
   const month = getRouterParam(event, 'month')
 
@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
 
   const monthPrefix = `${year}-${month.padStart(2, '0')}`
 
-  const records = await db.select({
+  const rows = await db.select({
     id: attendance.id,
     employeeId: attendance.employeeId,
     employeeName: employees.name,
@@ -31,7 +31,10 @@ export default defineEventHandler(async (event) => {
     .innerJoin(employees, eq(attendance.employeeId, employees.id))
     .where(like(attendance.date, `${monthPrefix}%`))
 
-  // Group by employee
+  const records = user.role === 'head' && user.departmentId
+    ? rows.filter(r => r.departmentId === user.departmentId)
+    : rows
+
   const grouped: Record<number, any> = {}
   for (const r of records) {
     if (!grouped[r.employeeId]) {

@@ -1,6 +1,6 @@
 import { db } from '~/server/db'
-import { users } from '~/server/db/schema'
-import { eq } from 'drizzle-orm'
+import { employees, users } from '~/server/db/schema'
+import { and, eq } from 'drizzle-orm'
 import { requireAuth } from '~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
@@ -19,5 +19,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: 'Авторизация қажет' })
   }
 
-  return { user }
+  const [employee] = await db.select({ id: employees.id })
+    .from(employees)
+    .where(and(eq(employees.userId, authUser.id), eq(employees.isActive, true)))
+
+  return {
+    user: {
+      ...user,
+      employeeId: employee?.id ?? null,
+    },
+  }
 })

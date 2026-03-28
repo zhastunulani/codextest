@@ -4,7 +4,7 @@ import { eq, like, and } from 'drizzle-orm'
 import { requireRole } from '~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
-  requireRole(event, ['admin'])
+  const user = requireRole(event, ['admin', 'head'])
   const body = await readBody(event)
   const { month, year } = body
 
@@ -12,11 +12,17 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Ай мен жыл қажет' })
   }
 
+  if (user.role === 'head' && !user.departmentId) {
+    throw createError({ statusCode: 403, statusMessage: 'Head үшін department бекітілмеген' })
+  }
+
   const [settings] = await db.select().from(salarySettings)
   if (!settings) throw createError({ statusCode: 500, statusMessage: 'Айлық баптаулары табылмады' })
 
   const monthPrefix = `${year}-${String(month).padStart(2, '0')}`
-  const activeEmployees = await db.select().from(employees).where(eq(employees.isActive, true))
+  const activeEmployees = user.role === 'head'
+    ? await db.select().from(employees).where(and(eq(employees.isActive, true), eq(employees.departmentId, user.departmentId!)))
+    : await db.select().from(employees).where(eq(employees.isActive, true))
 
   const results = []
 
@@ -48,7 +54,6 @@ export default defineEventHandler(async (event) => {
     const overtimeAmount = overtimeHours * hourlyRate * settings.overtimeCoefficient
     const totalAmount = baseAmount + overtimeAmount
 
-    // Upsert payroll record
     const [existing] = await db.select().from(payroll)
       .where(and(eq(payroll.employeeId, emp.id), eq(payroll.month, month), eq(payroll.year, year)))
 
@@ -71,7 +76,7 @@ export default defineEventHandler(async (event) => {
       await db.insert(payroll).values(payrollData)
     }
 
-    results.push({ ...payrollData, employeeName: emp.name })
+    results.push({ ...payrollData, employeeName: emp.name, departmentId: emp.departmentId })
   }
 
   return { month: monthPrefix, results }

@@ -1,7 +1,7 @@
 import { db } from '~/server/db'
-import { employees, departments, positions } from '~/server/db/schema'
+import { employees } from '~/server/db/schema'
 import { eq } from 'drizzle-orm'
-import { getAuthUser } from '~/server/utils/auth'
+import { requireRole } from '~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
@@ -19,11 +19,10 @@ export default defineEventHandler(async (event) => {
     return result.filter(e => e.faceDescriptor)
   }
 
-  // Protected: full employee list
-  const user = getAuthUser(event)
-  if (!user) throw createError({ statusCode: 401, statusMessage: 'Авторизация қажет' })
+  // Protected: admin/head only
+  const user = requireRole(event, ['admin', 'head'])
 
-  let query_builder = db.select({
+  const queryBuilder = db.select({
     id: employees.id,
     name: employees.name,
     departmentId: employees.departmentId,
@@ -36,14 +35,13 @@ export default defineEventHandler(async (event) => {
     createdAt: employees.createdAt,
   }).from(employees)
 
-  // Head sees only their department
   if (user.role === 'head' && user.departmentId) {
-    return await query_builder.where(eq(employees.departmentId, user.departmentId))
+    return await queryBuilder.where(eq(employees.departmentId, user.departmentId))
   }
 
   if (activeOnly) {
-    return await query_builder.where(eq(employees.isActive, true))
+    return await queryBuilder.where(eq(employees.isActive, true))
   }
 
-  return await query_builder
+  return await queryBuilder
 })

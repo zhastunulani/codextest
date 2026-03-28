@@ -1,12 +1,12 @@
 import { db } from '~/server/db'
 import { kpiTargets, departments } from '~/server/db/schema'
 import { eq } from 'drizzle-orm'
-import { requireAuth } from '~/server/utils/auth'
+import { requireRole } from '~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
+  const user = requireRole(event, ['admin', 'head'])
 
-  return await db.select({
+  const rows = await db.select({
     id: kpiTargets.id,
     departmentId: kpiTargets.departmentId,
     departmentName: departments.name,
@@ -16,4 +16,10 @@ export default defineEventHandler(async (event) => {
   })
     .from(kpiTargets)
     .leftJoin(departments, eq(kpiTargets.departmentId, departments.id))
+
+  if (user.role === 'head' && user.departmentId) {
+    return rows.filter(r => r.departmentId === user.departmentId)
+  }
+
+  return rows
 })

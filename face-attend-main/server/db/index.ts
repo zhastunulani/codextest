@@ -28,6 +28,7 @@ async function initDatabase() {
 
       CREATE TABLE IF NOT EXISTS positions (
         id SERIAL PRIMARY KEY,
+        user_id INTEGER,
         name TEXT NOT NULL,
         department_id INTEGER REFERENCES departments(id),
         created_at TEXT NOT NULL DEFAULT (now()::text)
@@ -45,6 +46,7 @@ async function initDatabase() {
 
       CREATE TABLE IF NOT EXISTS employees (
         id SERIAL PRIMARY KEY,
+        user_id INTEGER,
         name TEXT NOT NULL,
         department_id INTEGER REFERENCES departments(id),
         position_id INTEGER REFERENCES positions(id),
@@ -82,6 +84,10 @@ async function initDatabase() {
         created_at TEXT NOT NULL DEFAULT (now()::text)
       );
 
+
+
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS user_id INTEGER;
+      CREATE UNIQUE INDEX IF NOT EXISTS employees_user_id_unique ON employees(user_id) WHERE user_id IS NOT NULL;
       CREATE TABLE IF NOT EXISTS attendance (
         id SERIAL PRIMARY KEY,
         employee_id INTEGER NOT NULL REFERENCES employees(id),
