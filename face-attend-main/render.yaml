@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: face-attend
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: node .output/server/index.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NUXT_HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        sync: false
