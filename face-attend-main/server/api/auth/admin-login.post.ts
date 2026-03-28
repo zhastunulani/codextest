@@ -1,9 +1,13 @@
 import bcryptjs from 'bcryptjs'
 import { db } from '~/server/db'
 import { users } from '~/server/db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { signToken } from '~/server/utils/auth'
+import { checkRateLimit, clearRateLimit, consumeRateLimitFailure } from '~/server/utils/rate-limit'
 import { logAudit } from '~/server/utils/audit'
+
+const MAX_ATTEMPTS = 3
+const WINDOW_MS = 15 * 60 * 1000
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
@@ -13,23 +17,34 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Логин мен пароль қажет' })
   }
 
-  const [user] = await db.select().from(users).where(eq(users.login, login))
+  const limit = checkRateLimit(event, 'admin-login', MAX_ATTEMPTS, WINDOW_MS, String(login))
+  if (!limit.allowed) {
+    setResponseHeader(event, 'Retry-After', String(limit.retryAfterSec || 900))
+    throw createError({ statusCode: 429, statusMessage: 'Тым көп қате әрекет. Кейінірек қайталап көріңіз.' })
+  }
 
-  if (!user || !user.isActive || user.role === 'admin') {
-    await logAudit({ action: 'AUTH_LOGIN_FAILED', details: { login } })
+  const [user] = await db.select().from(users)
+    .where(and(eq(users.login, login), eq(users.role, 'admin')))
+
+  if (!user || !user.isActive) {
+    consumeRateLimitFailure(event, 'admin-login', WINDOW_MS, String(login))
+    await logAudit({ action: 'AUTH_ADMIN_LOGIN_FAILED', details: { login } })
     throw createError({ statusCode: 401, statusMessage: 'Логин немесе пароль қате' })
   }
 
   const valid = bcryptjs.compareSync(password, user.password)
   if (!valid) {
-    await logAudit({ userId: user.id, action: 'AUTH_LOGIN_FAILED', details: { login } })
+    consumeRateLimitFailure(event, 'admin-login', WINDOW_MS, String(login))
+    await logAudit({ userId: user.id, action: 'AUTH_ADMIN_LOGIN_FAILED', details: { login } })
     throw createError({ statusCode: 401, statusMessage: 'Логин немесе пароль қате' })
   }
+
+  clearRateLimit(event, 'admin-login', String(login))
 
   const token = signToken({
     id: user.id,
     login: user.login,
-    role: user.role as 'head' | 'employee',
+    role: 'admin',
     departmentId: user.departmentId ?? undefined,
   })
 
@@ -41,7 +56,7 @@ export default defineEventHandler(async (event) => {
     path: '/',
   })
 
-  await logAudit({ userId: user.id, action: 'AUTH_LOGIN_SUCCESS' })
+  await logAudit({ userId: user.id, action: 'AUTH_ADMIN_LOGIN_SUCCESS' })
 
   return {
     user: {

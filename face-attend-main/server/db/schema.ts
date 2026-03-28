@@ -13,7 +13,7 @@ export const users = pgTable('users', {
   login: text('login').notNull().unique(),
   password: text('password').notNull(),
   name: text('name').notNull(),
-  role: text('role').notNull().default('manager'),
+  role: text('role').notNull().default('employee'),
   departmentId: integer('department_id').references(() => departments.id),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
@@ -53,6 +53,20 @@ export const schedules = pgTable('schedules', {
   workStart: text('work_start').notNull(), // "09:00"
   workEnd: text('work_end').notNull(), // "18:00"
   workDays: text('work_days').notNull(), // JSON: [1,2,3,4,5] (1=дүйсенбі)
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+})
+
+
+export const departmentSalarySettings = pgTable('department_salary_settings', {
+  id: serial('id').primaryKey(),
+  departmentId: integer('department_id').notNull().references(() => departments.id),
+  type: text('type').notNull().default('oklad'), // 'oklad' | 'hourly' | 'kpi' | 'percent' | 'mixed'
+  baseSalary: real('base_salary').notNull().default(0),
+  hourlyRate: real('hourly_rate').notNull().default(0),
+  kpiEnabled: boolean('kpi_enabled').notNull().default(false),
+  kpiWeight: real('kpi_weight').notNull().default(0),
+  percentRate: real('percent_rate').notNull().default(0),
+  scheduleBased: boolean('schedule_based').notNull().default(true),
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 })
 
