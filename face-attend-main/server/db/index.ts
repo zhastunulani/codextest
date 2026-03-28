@@ -28,6 +28,7 @@ async function initDatabase() {
 
       CREATE TABLE IF NOT EXISTS positions (
         id SERIAL PRIMARY KEY,
+        user_id INTEGER,
         name TEXT NOT NULL,
         department_id INTEGER REFERENCES departments(id),
         created_at TEXT NOT NULL DEFAULT (now()::text)
@@ -45,6 +46,7 @@ async function initDatabase() {
 
       CREATE TABLE IF NOT EXISTS employees (
         id SERIAL PRIMARY KEY,
+        user_id INTEGER,
         name TEXT NOT NULL,
         department_id INTEGER REFERENCES departments(id),
         position_id INTEGER REFERENCES positions(id),
@@ -62,12 +64,30 @@ async function initDatabase() {
         login TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
         name TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'manager',
+        role TEXT NOT NULL DEFAULT 'employee',
         department_id INTEGER REFERENCES departments(id),
         is_active BOOLEAN NOT NULL DEFAULT true,
         created_at TEXT NOT NULL DEFAULT (now()::text)
       );
 
+
+      CREATE TABLE IF NOT EXISTS department_salary_settings (
+        id SERIAL PRIMARY KEY,
+        department_id INTEGER NOT NULL REFERENCES departments(id),
+        type TEXT NOT NULL DEFAULT 'oklad',
+        base_salary REAL NOT NULL DEFAULT 0,
+        hourly_rate REAL NOT NULL DEFAULT 0,
+        kpi_enabled BOOLEAN NOT NULL DEFAULT false,
+        kpi_weight REAL NOT NULL DEFAULT 0,
+        percent_rate REAL NOT NULL DEFAULT 0,
+        schedule_based BOOLEAN NOT NULL DEFAULT true,
+        created_at TEXT NOT NULL DEFAULT (now()::text)
+      );
+
+
+
+      ALTER TABLE employees ADD COLUMN IF NOT EXISTS user_id INTEGER;
+      CREATE UNIQUE INDEX IF NOT EXISTS employees_user_id_unique ON employees(user_id) WHERE user_id IS NOT NULL;
       CREATE TABLE IF NOT EXISTS attendance (
         id SERIAL PRIMARY KEY,
         employee_id INTEGER NOT NULL REFERENCES employees(id),
@@ -166,20 +186,6 @@ async function initDatabase() {
     const deptCheck = await client.query('SELECT id FROM departments LIMIT 1')
     if (deptCheck.rows.length === 0) {
       await client.query("INSERT INTO departments (name) VALUES ('IT бөлімі'), ('Бухгалтерия'), ('HR бөлімі')")
-    }
-
-    // Seed: head user
-    const headCheck = await client.query("SELECT id FROM users WHERE login = 'head'")
-    if (headCheck.rows.length === 0) {
-      const hash = bcryptjs.hashSync('head123', 10)
-      await client.query('INSERT INTO users (login, password, name, role, department_id) VALUES ($1, $2, $3, $4, $5)', ['head', hash, 'Бөлім басшысы', 'head', 1])
-    }
-
-    // Seed: manager user
-    const managerCheck = await client.query("SELECT id FROM users WHERE login = 'manager'")
-    if (managerCheck.rows.length === 0) {
-      const hash = bcryptjs.hashSync('manager123', 10)
-      await client.query('INSERT INTO users (login, password, name, role) VALUES ($1, $2, $3, $4)', ['manager', hash, 'Менеджер', 'manager'])
     }
 
     // Seed: default salary settings
