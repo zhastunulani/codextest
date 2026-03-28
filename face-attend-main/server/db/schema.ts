@@ -32,6 +32,7 @@ export const positions = pgTable('positions', {
 
 export const employees = pgTable('employees', {
   id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
   name: text('name').notNull(),
   departmentId: integer('department_id').references(() => departments.id),
   positionId: integer('position_id').references(() => positions.id),

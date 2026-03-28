@@ -1,6 +1,6 @@
 import bcryptjs from 'bcryptjs'
 import { db } from '~/server/db'
-import { users } from '~/server/db/schema'
+import { employees, users } from '~/server/db/schema'
 import { eq } from 'drizzle-orm'
 import { signToken } from '~/server/utils/auth'
 import { logAudit } from '~/server/utils/audit'
@@ -29,6 +29,13 @@ export default defineEventHandler(async (event) => {
     name: users.name,
     role: users.role,
     departmentId: users.departmentId,
+  })
+
+  await db.insert(employees).values({
+    userId: created.id,
+    name: created.name,
+    departmentId: created.departmentId ?? null,
+    isActive: true,
   })
 
   const token = signToken({
